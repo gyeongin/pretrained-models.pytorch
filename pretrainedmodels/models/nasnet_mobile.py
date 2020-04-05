@@ -92,7 +92,7 @@ class SeparableConv2d(nn.Module):
 
 class BranchSeparables(nn.Module):
 
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, name=None, bias=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, name='None', bias=False):
         super(BranchSeparables, self).__init__()
         self.relu = nn.ReLU()
         self.separable_1 = SeparableConv2d(in_channels, in_channels, kernel_size, stride, padding, bias=bias)
@@ -101,11 +101,15 @@ class BranchSeparables(nn.Module):
         self.separable_2 = SeparableConv2d(in_channels, out_channels, kernel_size, 1, padding, bias=bias)
         self.bn_sep_2 = nn.BatchNorm2d(out_channels, eps=0.001, momentum=0.1, affine=True)
         self.name = name
+        if self.name == 'specific':
+            self.pad = nn.ZeroPad2d((1, 0, 1, 0))
+        else:
+            self.pad = nn.Identity() # placeholder for torch.jit.script
 
     def forward(self, x):
         x = self.relu(x)
         if self.name == 'specific':
-            x = nn.ZeroPad2d((1, 0, 1, 0))(x)
+            x = self.pad(x)
         x = self.separable_1(x)
         if self.name == 'specific':
             x = x[:, :, 1:, 1:].contiguous()
