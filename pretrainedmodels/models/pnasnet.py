@@ -34,14 +34,15 @@ class MaxPool(nn.Module):
 
     def __init__(self, kernel_size, stride=1, padding=1, zero_pad=False):
         super(MaxPool, self).__init__()
-        self.zero_pad = nn.ZeroPad2d((1, 0, 1, 0)) if zero_pad else None
+        self.use_pad = zero_pad
+        self.zero_pad = nn.ZeroPad2d((1, 0, 1, 0))
         self.pool = nn.MaxPool2d(kernel_size, stride=stride, padding=padding)
 
     def forward(self, x):
-        if self.zero_pad:
+        if self.use_pad:
             x = self.zero_pad(x)
         x = self.pool(x)
-        if self.zero_pad:
+        if self.use_pad:
             x = x[:, :, 1:, 1:]
         return x
 
@@ -71,7 +72,8 @@ class BranchSeparables(nn.Module):
         super(BranchSeparables, self).__init__()
         padding = kernel_size // 2
         middle_channels = out_channels if stem_cell else in_channels
-        self.zero_pad = nn.ZeroPad2d((1, 0, 1, 0)) if zero_pad else None
+        self.use_pad = zero_pad
+        self.zero_pad = nn.ZeroPad2d((1, 0, 1, 0))
         self.relu_1 = nn.ReLU()
         self.separable_1 = SeparableConv2d(in_channels, middle_channels,
                                            kernel_size, dw_stride=stride,
@@ -85,10 +87,10 @@ class BranchSeparables(nn.Module):
 
     def forward(self, x):
         x = self.relu_1(x)
-        if self.zero_pad:
+        if self.use_pad:
             x = self.zero_pad(x)
         x = self.separable_1(x)
-        if self.zero_pad:
+        if self.use_pad:
             x = x[:, :, 1:, 1:].contiguous()
         x = self.bn_sep_1(x)
         x = self.relu_2(x)
@@ -166,10 +168,7 @@ class CellBase(nn.Module):
         x_comb_iter_3 = x_comb_iter_3_left + x_comb_iter_3_right
 
         x_comb_iter_4_left = self.comb_iter_4_left(x_left)
-        if self.comb_iter_4_right:
-            x_comb_iter_4_right = self.comb_iter_4_right(x_right)
-        else:
-            x_comb_iter_4_right = x_right
+        x_comb_iter_4_right = self.comb_iter_4_right(x_right)
         x_comb_iter_4 = x_comb_iter_4_left + x_comb_iter_4_right
 
         x_out = torch.cat(
@@ -275,11 +274,12 @@ class Cell(CellBase):
                                                  kernel_size=3, stride=stride,
                                                  zero_pad=zero_pad)
         if is_reduction:
+            self.use_comb_iter_4_right = True
             self.comb_iter_4_right = ReluConvBn(out_channels_right,
                                                 out_channels_right,
                                                 kernel_size=1, stride=stride)
         else:
-            self.comb_iter_4_right = None
+            self.comb_iter_4_right = nn.Identity()
 
     def forward(self, x_left, x_right):
         x_left = self.conv_prev_1x1(x_left)
