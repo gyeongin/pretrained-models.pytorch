@@ -217,8 +217,7 @@ class Block8(nn.Module):
         )
 
         self.conv2d = nn.Conv2d(448, 2080, kernel_size=1, stride=1)
-        if not self.noReLU:
-            self.relu = nn.ReLU(inplace=False)
+        self.relu = nn.ReLU(inplace=False)
 
     def forward(self, x):
         x0 = self.branch0(x)
